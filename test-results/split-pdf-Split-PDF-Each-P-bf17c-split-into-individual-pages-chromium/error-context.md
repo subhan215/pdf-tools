@@ -1,0 +1,44 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "Back to Tools" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img [ref=e6]
+          - text: Back to Tools
+        - generic [ref=e8]: document.pdf • 5 pages
+    - main [ref=e9]:
+      - generic [ref=e10]:
+        - heading "Split Mode" [level=3] [ref=e11]
+        - generic [ref=e12]:
+          - button "Extract Pages Select specific pages to extract" [ref=e13]:
+            - paragraph [ref=e14]: Extract Pages
+            - paragraph [ref=e15]: Select specific pages to extract
+          - button "Split by Range e.g., 1-3, 4-6, 7-10" [ref=e16]:
+            - paragraph [ref=e17]: Split by Range
+            - paragraph [ref=e18]: e.g., 1-3, 4-6, 7-10
+          - button "Each Page One PDF per page" [active] [ref=e19]:
+            - paragraph [ref=e20]: Each Page
+            - paragraph [ref=e21]: One PDF per page
+      - generic [ref=e22]:
+        - heading "Split Every Page" [level=3] [ref=e23]
+        - paragraph [ref=e24]: This will create 5 separate PDF files, one for each page. All files will be downloaded as a ZIP archive.
+      - button "Split & Download" [ref=e25]:
+        - img [ref=e26]
+        - text: Split & Download
+  - generic [ref=e33] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e34]:
+      - img [ref=e35]
+    - generic [ref=e38]:
+      - button "Open issues overlay" [ref=e39]:
+        - generic [ref=e40]:
+          - generic [ref=e41]: "0"
+          - generic [ref=e42]: "1"
+        - generic [ref=e43]: Issue
+      - button "Collapse issues badge" [ref=e44]:
+        - img [ref=e45]
+  - alert [ref=e47]
+```

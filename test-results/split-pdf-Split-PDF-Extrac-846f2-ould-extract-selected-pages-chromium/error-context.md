@@ -1,0 +1,76 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "Back to Tools" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img [ref=e6]
+          - text: Back to Tools
+        - generic [ref=e8]: document.pdf • 5 pages
+    - main [ref=e9]:
+      - generic [ref=e10]:
+        - heading "Split Mode" [level=3] [ref=e11]
+        - generic [ref=e12]:
+          - button "Extract Pages Select specific pages to extract" [ref=e13]:
+            - paragraph [ref=e14]: Extract Pages
+            - paragraph [ref=e15]: Select specific pages to extract
+          - button "Split by Range e.g., 1-3, 4-6, 7-10" [ref=e16]:
+            - paragraph [ref=e17]: Split by Range
+            - paragraph [ref=e18]: e.g., 1-3, 4-6, 7-10
+          - button "Each Page One PDF per page" [ref=e19]:
+            - paragraph [ref=e20]: Each Page
+            - paragraph [ref=e21]: One PDF per page
+      - generic [ref=e22]:
+        - generic [ref=e23]:
+          - heading "Select Pages" [level=3] [ref=e24]
+          - generic [ref=e25]:
+            - button "Select All" [ref=e26]
+            - generic [ref=e27]: "|"
+            - button "Deselect All" [ref=e28]
+        - generic [ref=e29]:
+          - generic [ref=e30] [cursor=pointer]:
+            - img "Page 1" [ref=e31]
+            - generic [ref=e32]: "1"
+            - button "Rotate page" [ref=e33]:
+              - img [ref=e34]
+          - generic [ref=e37] [cursor=pointer]:
+            - img "Page 2" [ref=e38]
+            - generic [ref=e39]: "2"
+            - img [ref=e41]
+            - button "Rotate page" [ref=e43]:
+              - img [ref=e44]
+          - generic [ref=e47] [cursor=pointer]:
+            - img "Page 3" [ref=e48]
+            - generic [ref=e49]: "3"
+            - button "Rotate page" [ref=e50]:
+              - img [ref=e51]
+          - generic [ref=e54] [cursor=pointer]:
+            - img "Page 4" [ref=e55]
+            - generic [ref=e56]: "4"
+            - button "Rotate page" [ref=e57]:
+              - img [ref=e58]
+          - generic [ref=e61] [cursor=pointer]:
+            - img [ref=e62]
+            - generic [ref=e65]: "5"
+            - button "Rotate page" [ref=e66]:
+              - img [ref=e67]
+        - paragraph [ref=e70]: 1 pages selected
+      - button "Split & Download" [ref=e71]:
+        - img [ref=e72]
+        - text: Split & Download
+  - generic [ref=e79] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e80]:
+      - img [ref=e81]
+    - generic [ref=e84]:
+      - button "Open issues overlay" [ref=e85]:
+        - generic [ref=e86]:
+          - generic [ref=e87]: "0"
+          - generic [ref=e88]: "1"
+        - generic [ref=e89]: Issue
+      - button "Collapse issues badge" [ref=e90]:
+        - img [ref=e91]
+  - alert [ref=e93]
+```

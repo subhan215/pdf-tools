@@ -1,0 +1,45 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "Back to Tools" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img [ref=e6]
+          - text: Back to Tools
+        - generic [ref=e8]: single.pdf • 1 pages
+    - main [ref=e9]:
+      - generic [ref=e10]:
+        - heading "Split Mode" [level=3] [ref=e11]
+        - generic [ref=e12]:
+          - button "Extract Pages Select specific pages to extract" [ref=e13]:
+            - paragraph [ref=e14]: Extract Pages
+            - paragraph [ref=e15]: Select specific pages to extract
+          - button "Split by Range e.g., 1-3, 4-6, 7-10" [ref=e16]:
+            - paragraph [ref=e17]: Split by Range
+            - paragraph [ref=e18]: e.g., 1-3, 4-6, 7-10
+          - button "Each Page One PDF per page" [ref=e19]:
+            - paragraph [ref=e20]: Each Page
+            - paragraph [ref=e21]: One PDF per page
+      - generic [ref=e22]:
+        - generic [ref=e23]:
+          - heading "Select Pages" [level=3] [ref=e24]
+          - generic [ref=e25]:
+            - button "Select All" [ref=e26]
+            - generic [ref=e27]: "|"
+            - button "Deselect All" [ref=e28]
+        - generic [ref=e30] [cursor=pointer]:
+          - img "Page 1" [ref=e31]
+          - generic [ref=e32]: "1"
+          - button "Rotate page" [ref=e33]:
+            - img [ref=e34]
+        - paragraph [ref=e37]: 0 pages selected
+      - button "Split & Download" [ref=e38]:
+        - img [ref=e39]
+        - text: Split & Download
+  - button "Open Next.js Dev Tools" [ref=e47] [cursor=pointer]:
+    - img [ref=e48]
+  - alert [ref=e51]
+```

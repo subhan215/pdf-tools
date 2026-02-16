@@ -1,0 +1,45 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "Back to Tools" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img [ref=e6]
+          - text: Back to Tools
+        - generic [ref=e8]: document.pdf • 10 pages
+    - main [ref=e9]:
+      - generic [ref=e10]:
+        - heading "Split Mode" [level=3] [ref=e11]
+        - generic [ref=e12]:
+          - button "Extract Pages Select specific pages to extract" [ref=e13]:
+            - paragraph [ref=e14]: Extract Pages
+            - paragraph [ref=e15]: Select specific pages to extract
+          - button "Split by Range e.g., 1-3, 4-6, 7-10" [ref=e16]:
+            - paragraph [ref=e17]: Split by Range
+            - paragraph [ref=e18]: e.g., 1-3, 4-6, 7-10
+          - button "Each Page One PDF per page" [ref=e19]:
+            - paragraph [ref=e20]: Each Page
+            - paragraph [ref=e21]: One PDF per page
+      - generic [ref=e22]:
+        - heading "Enter Page Ranges" [level=3] [ref=e23]
+        - textbox "e.g., 1-3, 4-6, 7-10" [active] [ref=e24]: invalid-range
+        - paragraph [ref=e25]: "Total pages: 10. Each range will become a separate PDF file."
+      - button "Split & Download" [ref=e26]:
+        - img [ref=e27]
+        - text: Split & Download
+  - generic [ref=e34] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e35]:
+      - img [ref=e36]
+    - generic [ref=e39]:
+      - button "Open issues overlay" [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]: "0"
+          - generic [ref=e43]: "1"
+        - generic [ref=e44]: Issue
+      - button "Collapse issues badge" [ref=e45]:
+        - img [ref=e46]
+  - alert [ref=e48]
+```
