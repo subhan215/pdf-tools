@@ -1,7 +1,6 @@
-"use client";
-
-import { useState, useEffect, useCallback, useRef } from "react";
-import Peer, { DataConnection } from "peerjs";
+// Type definitions for PDF collaboration
+// The usePeer hook has been replaced by useSupabaseCollab.
+// This file is kept for type exports used throughout the app.
 
 export interface SharedImage {
   id: string;
@@ -20,7 +19,8 @@ export type PeerMessage =
   | { type: "sync-request" }
   | { type: "sync-response"; state: CollabState }
   | { type: "share-image"; image: SharedImage }
-  | { type: "delete-shared-image"; id: string };
+  | { type: "delete-shared-image"; id: string }
+  | { type: "peer-count"; count: number };
 
 export interface TextStyle {
   fontFamily: string;
@@ -79,126 +79,4 @@ export interface CollabState {
   elements: PDFElement[];
   pages: PageSize[];
   sharedImages?: SharedImage[];
-}
-
-interface UsePeerOptions {
-  onMessage?: (message: PeerMessage, peerId: string) => void;
-  onPeerConnect?: (peerId: string) => void;
-  onPeerDisconnect?: (peerId: string) => void;
-}
-
-export function usePeer(options: UsePeerOptions = {}) {
-  const [peer, setPeer] = useState<Peer | null>(null);
-  const [peerId, setPeerId] = useState<string | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
-
-  const connectionsRef = useRef<Map<string, DataConnection>>(new Map());
-  const optionsRef = useRef(options);
-  optionsRef.current = options;
-
-  // Initialize peer
-  const initPeer = useCallback(() => {
-    setIsConnecting(true);
-    setError(null);
-
-    const newPeer = new Peer({
-      debug: 0,
-    });
-
-    newPeer.on("open", (id) => {
-      setPeerId(id);
-      setIsConnecting(false);
-      setIsConnected(true);
-    });
-
-    newPeer.on("connection", (conn) => {
-      setupConnection(conn);
-    });
-
-    newPeer.on("error", (err) => {
-      setError(err.message);
-      setIsConnecting(false);
-    });
-
-    newPeer.on("disconnected", () => {
-      setIsConnected(false);
-    });
-
-    setPeer(newPeer);
-
-    return newPeer;
-  }, []);
-
-  // Setup connection handlers
-  const setupConnection = useCallback((conn: DataConnection) => {
-    conn.on("open", () => {
-      connectionsRef.current.set(conn.peer, conn);
-      setConnectedPeers(Array.from(connectionsRef.current.keys()));
-      optionsRef.current.onPeerConnect?.(conn.peer);
-    });
-
-    conn.on("data", (data) => {
-      const message = data as PeerMessage;
-      optionsRef.current.onMessage?.(message, conn.peer);
-    });
-
-    conn.on("close", () => {
-      connectionsRef.current.delete(conn.peer);
-      setConnectedPeers(Array.from(connectionsRef.current.keys()));
-      optionsRef.current.onPeerDisconnect?.(conn.peer);
-    });
-
-    conn.on("error", (err) => {
-      console.error("Connection error:", err);
-    });
-  }, []);
-
-  // Connect to another peer
-  const connectToPeer = useCallback((remotePeerId: string) => {
-    if (!peer) return;
-
-    const conn = peer.connect(remotePeerId, { reliable: true });
-    setupConnection(conn);
-  }, [peer, setupConnection]);
-
-  // Send message to all connected peers
-  const broadcast = useCallback((message: PeerMessage) => {
-    connectionsRef.current.forEach((conn) => {
-      if (conn.open) {
-        conn.send(message);
-      }
-    });
-  }, []);
-
-  // Send message to specific peer
-  const sendTo = useCallback((remotePeerId: string, message: PeerMessage) => {
-    const conn = connectionsRef.current.get(remotePeerId);
-    if (conn?.open) {
-      conn.send(message);
-    }
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      connectionsRef.current.forEach((conn) => conn.close());
-      peer?.destroy();
-    };
-  }, [peer]);
-
-  return {
-    peer,
-    peerId,
-    isConnecting,
-    isConnected,
-    error,
-    connectedPeers,
-    initPeer,
-    connectToPeer,
-    broadcast,
-    sendTo,
-  };
 }

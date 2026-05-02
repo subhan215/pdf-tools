@@ -14,6 +14,7 @@ import {
   ArrowRight,
   Sparkles,
   Globe,
+  MessageSquare,
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -114,9 +115,9 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
             <div className="w-9 h-9 bg-gradient-to-br from-orange-300 to-orange-500 rounded-xl flex items-center justify-center shadow-md shadow-orange-400/25">
-              <span className="text-white font-bold text-sm">PM</span>
+              <span className="text-white font-bold text-sm">PD</span>
             </div>
-            <span className="font-bold text-lg tracking-tight text-orange-950 dark:text-white">PDFMaaryo</span>
+            <span className="font-bold text-lg tracking-tight text-orange-950 dark:text-white">PeerDoc</span>
           </Link>
           <div className="flex items-center gap-3">
             <Link
@@ -248,7 +249,7 @@ export default function Home() {
       {/* Trust Section */}
       <section className="max-w-6xl mx-auto px-4 py-20">
         <div className="text-center mb-14">
-          <h2 className="text-3xl font-bold mb-3 text-zinc-800 dark:text-white">Why PDFMaaryo?</h2>
+          <h2 className="text-3xl font-bold mb-3 text-zinc-800 dark:text-white">Why PeerDoc?</h2>
           <p className="text-zinc-500 dark:text-zinc-400 max-w-xl mx-auto">
             We built the PDF tool we wished existed. Private, fast, and truly free.
           </p>
@@ -297,13 +298,18 @@ export default function Home() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 bg-gradient-to-br from-orange-300 to-orange-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xs">PM</span>
+                <span className="text-white font-bold text-xs">PD</span>
               </div>
-              <span className="font-semibold text-zinc-700 dark:text-zinc-300">PDFMaaryo</span>
+              <span className="font-semibold text-zinc-700 dark:text-zinc-300">PeerDoc</span>
             </div>
-            <p className="text-sm text-zinc-400 dark:text-zinc-500 text-center">
-              100% free. Your files never leave your browser.
-            </p>
+            <div className="flex items-center gap-4">
+              <p className="text-sm text-zinc-400 dark:text-zinc-500 text-center">
+                100% free. Your files never leave your browser.
+              </p>
+              <Link href="/feedback" className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-zinc-500 hover:text-orange-500 transition-colors">
+                <MessageSquare className="w-3.5 h-3.5" />Feedback
+              </Link>
+            </div>
             <ThemeToggle />
           </div>
         </div>

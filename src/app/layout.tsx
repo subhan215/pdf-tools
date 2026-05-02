@@ -9,12 +9,12 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "PDFMaaryo - Free Online PDF Editor & Collaborator",
+  title: "PeerDoc - Free Online PDF Editor & Collaborator",
   description: "Free, private PDF tools. Edit, create, merge, split, compress PDFs. Collaborate across devices in real-time. No signup required. 100% browser-based.",
-  keywords: ["PDF editor", "PDF tools", "merge PDF", "split PDF", "compress PDF", "collaborate PDF", "free PDF editor", "PDFMaaryo"],
-  authors: [{ name: "PDFMaaryo" }],
+  keywords: ["PDF editor", "PDF tools", "merge PDF", "split PDF", "compress PDF", "collaborate PDF", "free PDF editor", "PeerDoc"],
+  authors: [{ name: "PeerDoc" }],
   openGraph: {
-    title: "PDFMaaryo - Free Online PDF Editor & Collaborator",
+    title: "PeerDoc - Free Online PDF Editor & Collaborator",
     description: "Free, private PDF tools. Collaborate across devices in real-time. No signup required.",
     type: "website",
   },

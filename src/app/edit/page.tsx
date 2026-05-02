@@ -8,7 +8,7 @@ import {
   AlignRight, AlignJustify, List, ListOrdered, Square, Circle, Minus,
   ArrowRight, Triangle, Heading1, Heading2, MousePointer2,
   ZoomIn, ZoomOut, Undo, Redo, Palette, Highlighter, ChevronDown, X,
-  ScanText, Loader2, Table as TableIcon, RotateCw, Pencil, StickyNote, Eraser,
+  Loader2, Table as TableIcon, RotateCw, Pencil, StickyNote, Eraser,
   Keyboard, CheckSquare, Check, FilePlus, FileX, Scaling, Save, FolderOpen,
   Clock, Trash
 } from "lucide-react";
@@ -40,7 +40,6 @@ import {
   type SessionMetadata,
   type SessionElement,
 } from "@/lib/session-storage";
-import { extractTextFromImage, scaleOCRResult, type OCRLine, OCR_LANGUAGES, type OCRLanguageCode } from "@/lib/ocr-utils";
 import type { PDFElement, PageSize, TextStyle, ShapeStyle } from "@/hooks/usePeer";
 import RichTextEditor, { RichTextEditorRef } from "@/components/RichTextEditor";
 import KeyboardShortcutsModal from "@/components/KeyboardShortcutsModal";
@@ -157,6 +156,11 @@ export default function EditPage() {
   const [showResizePageModal, setShowResizePageModal] = useState(false);
   const [showSessionsModal, setShowSessionsModal] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+
+  // Bulk delete pages
+  const [showDeleteMenu, setShowDeleteMenu] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [selectedPagesForDelete, setSelectedPagesForDelete] = useState<Set<number>>(new Set());
   const [tableRows, setTableRows] = useState(3);
   const [tableCols, setTableCols] = useState(3);
 
@@ -179,11 +183,6 @@ export default function EditPage() {
   const [history, setHistory] = useState<HistorySnapshot[]>([emptySnapshot]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
-  // OCR state
-  const [isOCRProcessing, setIsOCRProcessing] = useState(false);
-  const [ocrProgress, setOcrProgress] = useState(0);
-  const [ocrLanguage, setOcrLanguage] = useState<OCRLanguageCode>("eng");
-  const [showOcrLanguageMenu, setShowOcrLanguageMenu] = useState(false);
 
   // Page rotation state - tracks rotation for each page
   const [pageRotations, setPageRotations] = useState<Map<number, RotationDegrees>>(new Map());
@@ -472,41 +471,6 @@ export default function EditPage() {
     setElements(prev => prev.map(el => el.id === id ? { ...el, ...updates } : el));
   };
 
-  // OCR
-  const runOCR = async () => {
-    if (!canvasRef.current || isOCRProcessing) return;
-    setIsOCRProcessing(true);
-    setOcrProgress(0);
-    try {
-      const result = await extractTextFromImage(
-        canvasRef.current,
-        (progress) => {
-          setOcrProgress(Math.round(progress * 100));
-        },
-        ocrLanguage
-      );
-      if (result.fullText.trim()) {
-        const el: PDFElement = {
-          id: generateId(),
-          type: "richtext",
-          pageIndex: currentPage,
-          x: 50,
-          y: 50,
-          width: pages[currentPage]?.width - 100 || 495,
-          height: 200,
-          content: `<p>${result.fullText.replace(/\n/g, '</p><p>')}</p>`,
-        };
-        const newElements = [...elements, el];
-        setElements(newElements);
-        saveToHistory(buildSnapshot(newElements));
-      }
-    } catch (err) {
-      console.error("OCR failed:", err);
-    } finally {
-      setIsOCRProcessing(false);
-      setOcrProgress(0);
-    }
-  };
 
   // Download PDF
   const downloadPDF = async () => {
@@ -563,6 +527,31 @@ export default function EditPage() {
     setPdfBase64(newBase64);
     setPages(newPages);
     setCurrentPage(Math.max(0, currentPage - 1));
+    saveToHistory(buildSnapshot(newElements));
+  };
+
+  const deleteMultiplePages = async (pageIndices: Set<number>) => {
+    if (!pdfBase64 || pageIndices.size === 0 || pageIndices.size >= pages.length) return;
+    const { PDFDocument } = await import("pdf-lib");
+    const doc = await PDFDocument.load(base64ToArrayBuffer(pdfBase64));
+    const sorted = Array.from(pageIndices).sort((a, b) => b - a);
+    for (const idx of sorted) {
+      doc.removePage(idx);
+    }
+    const newBase64 = arrayBufferToBase64(await doc.save());
+    const newElements = elements
+      .filter(el => !pageIndices.has(el.pageIndex))
+      .map(el => {
+        const shiftBy = sorted.filter(idx => idx < el.pageIndex).length;
+        return { ...el, pageIndex: el.pageIndex - shiftBy };
+      });
+    const newPages = pages.filter((_, i) => !pageIndices.has(i));
+    setElements(newElements);
+    setPdfBase64(newBase64);
+    setPages(newPages);
+    setCurrentPage(0);
+    setSelectedPagesForDelete(new Set());
+    setShowBulkDeleteModal(false);
     saveToHistory(buildSnapshot(newElements));
   };
 
@@ -834,8 +823,15 @@ export default function EditPage() {
   };
 
   // Render PDF
+  // Render PDF
+  const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
+  const rotation = getCurrentPageRotation();
   useEffect(() => {
     if (!pdfBase64 || !canvasRef.current) return;
+    if (renderTaskRef.current) {
+      renderTaskRef.current.cancel();
+      renderTaskRef.current = null;
+    }
     const renderPage = async () => {
       const pdfjsLib = await import("pdfjs-dist");
       pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.4.530/build/pdf.worker.min.mjs`;
@@ -845,16 +841,23 @@ export default function EditPage() {
       const canvas = canvasRef.current!;
       const ctx = canvas.getContext("2d")!;
       const dpr = window.devicePixelRatio || 1;
-      const viewport = page.getViewport({ scale: 1 });
+      const viewport = page.getViewport({ scale: 1, rotation });
       canvas.width = viewport.width * dpr;
       canvas.height = viewport.height * dpr;
       canvas.style.width = `${viewport.width}px`;
       canvas.style.height = `${viewport.height}px`;
       ctx.scale(dpr, dpr);
-      await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+      const task = page.render({ canvasContext: ctx, viewport, canvas });
+      renderTaskRef.current = task;
+      try {
+        await task.promise;
+      } catch (e: unknown) {
+        if (e instanceof Error && e.message === 'Rendering cancelled') return;
+        throw e;
+      }
     };
     renderPage();
-  }, [pdfBase64, currentPage]);
+  }, [pdfBase64, currentPage, rotation]);
 
   // Initialize signature canvas
   useEffect(() => {
@@ -884,7 +887,6 @@ export default function EditPage() {
       setShowStrokeMenu(false);
       setShowFillMenu(false);
       setShowDrawColorMenu(false);
-      setShowOcrLanguageMenu(false);
       setShowLineSpacingMenu(false);
     };
     document.addEventListener("click", handleClick);
@@ -1008,16 +1010,16 @@ export default function EditPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <label className="block cursor-pointer">
-              <div className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl p-8 text-center hover:border-indigo-500 transition-colors h-full flex flex-col items-center justify-center">
-                <Upload className="w-10 h-10 mx-auto mb-3 text-zinc-400" />
-                <p className="font-medium mb-1">Upload PDF</p>
-                <p className="text-sm text-zinc-500">Open an existing file</p>
+              <div className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl p-12 text-center hover:border-orange-400 transition-colors h-full flex flex-col items-center justify-center">
+                <Upload className="w-12 h-12 mx-auto mb-4 text-zinc-400" />
+                <p className="font-medium mb-2">Click to upload PDF</p>
+                <p className="text-sm text-zinc-500">or drag and drop</p>
               </div>
               <input type="file" accept=".pdf" className="hidden" onChange={handlePDFUpload} />
             </label>
-            <button onClick={() => createBlank()} className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl p-8 text-center hover:border-indigo-500 transition-colors flex flex-col items-center justify-center">
-              <FilePlus className="w-10 h-10 mx-auto mb-3 text-zinc-400" />
-              <p className="font-medium mb-1">Create Blank PDF</p>
+            <button onClick={() => createBlank()} className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl p-12 text-center hover:border-orange-400 transition-colors flex flex-col items-center justify-center">
+              <FilePlus className="w-12 h-12 mx-auto mb-4 text-zinc-400" />
+              <p className="font-medium mb-2">Create Blank PDF</p>
               <p className="text-sm text-zinc-500">Start from scratch (A4)</p>
             </button>
           </div>
@@ -1087,7 +1089,38 @@ export default function EditPage() {
               <button onClick={() => setCurrentPage(p => Math.min(pages.length - 1, p + 1))} disabled={currentPage === pages.length - 1} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
               <button onClick={() => setShowPageSizeModal(true)} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded" title="Add Page"><FilePlus className="w-4 h-4" /></button>
               <button onClick={() => setShowResizePageModal(true)} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded" title="Resize Page"><Scaling className="w-4 h-4" /></button>
-              <button onClick={deletePage} disabled={pages.length <= 1} className="p-1 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-500 rounded disabled:opacity-40" title="Delete Page"><FileX className="w-4 h-4" /></button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowDeleteMenu(prev => !prev)}
+                  disabled={pages.length <= 1}
+                  className="p-1 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-500 rounded disabled:opacity-40 flex items-center gap-0.5"
+                  title="Delete Page"
+                >
+                  <FileX className="w-4 h-4" />
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                {showDeleteMenu && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowDeleteMenu(false)} />
+                    <div className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 min-w-[200px]">
+                      <button
+                        onClick={() => { deletePage(); setShowDeleteMenu(false); }}
+                        className="w-full text-left px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400 rounded-t-lg flex items-center gap-2 transition-colors"
+                      >
+                        <FileX className="w-4 h-4" />
+                        Delete Current Page
+                      </button>
+                      <button
+                        onClick={() => { setSelectedPagesForDelete(new Set()); setShowBulkDeleteModal(true); setShowDeleteMenu(false); }}
+                        className="w-full text-left px-3 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400 rounded-b-lg flex items-center gap-2 border-t border-zinc-100 dark:border-zinc-700 transition-colors"
+                      >
+                        <Trash className="w-4 h-4" />
+                        Select &amp; Delete Multiple...
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
             {/* Zoom */}
             <div className="flex items-center gap-1 border-l border-zinc-200 dark:border-zinc-700 pl-2 ml-2">
@@ -1352,35 +1385,6 @@ export default function EditPage() {
 
         {/* Tools */}
         <div className="flex items-center gap-1 ml-auto">
-          {/* OCR Language Selector */}
-          <div className="relative" onClick={e => e.stopPropagation()}>
-            <button
-              onClick={() => setShowOcrLanguageMenu(!showOcrLanguageMenu)}
-              className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded flex items-center gap-1 text-xs"
-              title="OCR Language"
-            >
-              <span>{OCR_LANGUAGES.find(l => l.code === ocrLanguage)?.flag}</span>
-              <ChevronDown className="w-3 h-3" />
-            </button>
-            {showOcrLanguageMenu && (
-              <div className="absolute top-full right-0 mt-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg py-1 z-50 max-h-64 overflow-y-auto min-w-[180px]">
-                {OCR_LANGUAGES.map(lang => (
-                  <button
-                    key={lang.code}
-                    onClick={() => { setOcrLanguage(lang.code); setShowOcrLanguageMenu(false); }}
-                    className={`w-full px-3 py-1.5 text-left hover:bg-zinc-100 dark:hover:bg-zinc-700 text-sm flex items-center gap-2 ${ocrLanguage === lang.code ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                  >
-                    <span>{lang.flag}</span>
-                    <span>{lang.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button onClick={runOCR} disabled={isOCRProcessing} className={`p-2 rounded flex items-center gap-1 ${isOCRProcessing ? "bg-amber-100 text-amber-600" : "hover:bg-amber-100 text-amber-600"}`} title="Extract Text (OCR)">
-            {isOCRProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanText className="w-4 h-4" />}
-            {isOCRProcessing && <span className="text-xs">{ocrProgress}%</span>}
-          </button>
           <button onClick={addTextElement} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded" title="Add Text"><Type className="w-4 h-4" /></button>
           <button onClick={() => imageInputRef.current?.click()} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded" title="Add Image"><ImageIcon className="w-4 h-4" /></button>
           <button onClick={() => setShowSignatureModal(true)} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded" title="Add Signature"><PenLine className="w-4 h-4" /></button>
@@ -1394,10 +1398,10 @@ export default function EditPage() {
         <div
           className="relative bg-white shadow-lg transition-transform origin-center"
           style={{
-            width: getCurrentPageRotation() === 90 || getCurrentPageRotation() === 270
+            width: rotation === 90 || rotation === 270
               ? pages[currentPage]?.height || 842
               : pages[currentPage]?.width || 595,
-            height: getCurrentPageRotation() === 90 || getCurrentPageRotation() === 270
+            height: rotation === 90 || rotation === 270
               ? pages[currentPage]?.width || 595
               : pages[currentPage]?.height || 842,
             transform: `scale(${zoomLevel})`,
@@ -1418,17 +1422,7 @@ export default function EditPage() {
           <canvas
             ref={canvasRef}
             className="absolute inset-0 w-full h-full"
-            style={{
-              pointerEvents: "none",
-              transformOrigin: "center center",
-              transform: `rotate(${getCurrentPageRotation()}deg)`,
-              width: getCurrentPageRotation() === 90 || getCurrentPageRotation() === 270
-                ? pages[currentPage]?.height || 842
-                : pages[currentPage]?.width || 595,
-              height: getCurrentPageRotation() === 90 || getCurrentPageRotation() === 270
-                ? pages[currentPage]?.width || 595
-                : pages[currentPage]?.height || 842,
-            }}
+            style={{ pointerEvents: "none" }}
           />
 
           {/* Shape Preview */}
@@ -1727,6 +1721,86 @@ export default function EditPage() {
               ))}
             </div>
             <button onClick={() => setShowResizePageModal(false)} className="w-full mt-4 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl font-medium">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Pages Modal */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 w-full max-w-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Select Pages to Delete</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (selectedPagesForDelete.size === pages.length - 1) {
+                      setSelectedPagesForDelete(new Set());
+                    } else {
+                      const all = new Set(pages.map((_, i) => i));
+                      setSelectedPagesForDelete(all);
+                    }
+                  }}
+                  className="text-xs px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                >
+                  {selectedPagesForDelete.size === pages.length - 1 ? "Deselect All" : "Select All"}
+                </button>
+                <button onClick={() => setShowBulkDeleteModal(false)} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded"><X className="w-5 h-5" /></button>
+              </div>
+            </div>
+            <p className="text-sm text-zinc-500 mb-3">Click pages to select them for deletion. At least one page must remain.</p>
+            <div className="grid grid-cols-5 gap-3 max-h-[400px] overflow-y-auto p-1">
+              {pages.map((page, idx) => {
+                const isSelected = selectedPagesForDelete.has(idx);
+                const wouldDeleteAll = isSelected ? false : selectedPagesForDelete.size >= pages.length - 1;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      const next = new Set(selectedPagesForDelete);
+                      if (isSelected) {
+                        next.delete(idx);
+                      } else if (!wouldDeleteAll) {
+                        next.add(idx);
+                      }
+                      setSelectedPagesForDelete(next);
+                    }}
+                    disabled={!isSelected && wouldDeleteAll}
+                    className={`relative rounded-lg border-2 p-2 transition-all ${
+                      isSelected
+                        ? "border-red-500 bg-red-50 dark:bg-red-950/30"
+                        : wouldDeleteAll
+                          ? "border-zinc-200 dark:border-zinc-700 opacity-40 cursor-not-allowed"
+                          : "border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500"
+                    }`}
+                  >
+                    {isSelected && (
+                      <div className="absolute top-1 right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                        <Check className="w-3 h-3 text-white" />
+                      </div>
+                    )}
+                    <div
+                      className="w-full bg-zinc-100 dark:bg-zinc-800 rounded flex items-center justify-center"
+                      style={{ aspectRatio: `${page.width} / ${page.height}` }}
+                    >
+                      <span className="text-lg font-bold text-zinc-400">{idx + 1}</span>
+                    </div>
+                    <p className="text-xs text-center mt-1 text-zinc-500">Page {idx + 1}</p>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setShowBulkDeleteModal(false)} className="flex-1 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl font-medium">Cancel</button>
+              <button
+                onClick={() => deleteMultiplePages(selectedPagesForDelete)}
+                disabled={selectedPagesForDelete.size === 0}
+                className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:hover:bg-red-500 text-white rounded-xl font-medium flex items-center justify-center gap-2"
+              >
+                <Trash className="w-4 h-4" />
+                {selectedPagesForDelete.size > 0 ? `Delete ${selectedPagesForDelete.size} Page${selectedPagesForDelete.size > 1 ? "s" : ""}` : "Select pages"}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -454,10 +454,10 @@ export default function BatchPage() {
 
         {/* Upload area */}
         <label className="block cursor-pointer mb-6">
-          <div className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl p-8 text-center hover:border-indigo-500 transition-colors">
-            <Upload className="w-10 h-10 mx-auto mb-3 text-zinc-400" />
-            <p className="font-medium mb-1">Click to upload PDFs</p>
-            <p className="text-sm text-zinc-500">or drag and drop multiple files</p>
+          <div className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl p-12 text-center hover:border-orange-400 transition-colors">
+            <Upload className="w-12 h-12 mx-auto mb-4 text-zinc-400" />
+            <p className="font-medium mb-2">Click to upload PDFs</p>
+            <p className="text-sm text-zinc-500">or drag and drop</p>
           </div>
           <input
             ref={fileInputRef}

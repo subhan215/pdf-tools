@@ -10,7 +10,7 @@ import {
   AlignRight, AlignJustify, List, ListOrdered, Square, Circle, Minus,
   ArrowRight, Triangle, Heading1, Heading2, MousePointer2,
   ZoomIn, ZoomOut, Table as TableIcon,
-  Undo, Redo, Share, Palette, Highlighter, ChevronDown, ScanText, Loader2, X,
+  Undo, Redo, Share, Palette, Highlighter, ChevronDown, Loader2, X,
   Save, FolderOpen, Clock, Trash, Images, Plus, Scaling
 } from "lucide-react";
 import {
@@ -25,10 +25,9 @@ import {
   type SessionElement,
 } from "@/lib/session-storage";
 import { Rnd } from "react-rnd";
-import { usePeer, type PDFElement, type PeerMessage, type PageSize, type TextStyle, type ShapeStyle, type SharedImage } from "@/hooks/usePeer";
+import { useSupabaseCollab, type PDFElement, type PeerMessage, type PageSize, type TextStyle, type ShapeStyle, type SharedImage } from "@/hooks/useSupabaseCollab";
 import { createBlankPDF, arrayBufferToBase64, base64ToArrayBuffer, addElementsToPDF, getPDFPageSizes, PAGE_SIZES, generateId, downloadBlob, fileToBase64 } from "@/lib/pdf-utils";
 import RichTextEditor, { RichTextEditorRef } from "@/components/RichTextEditor";
-import { extractTextFromImage, scaleOCRResult, type OCRLine } from "@/lib/ocr-utils";
 
 // Import extracted components
 import {
@@ -111,9 +110,14 @@ export default function CollaboratePage() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const signatureCanvasRef = useRef<HTMLCanvasElement>(null);
   const activeEditorRef = useRef<RichTextEditorRef>(null);
+  const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  // Track element IDs recently updated by remote peers (prevents echo broadcasts)
+  const remoteUpdatedIdsRef = useRef<Set<string>>(new Set());
+  // Debounce timers for element content broadcasts
+  const broadcastTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [isDrawingShape, setIsDrawingShape] = useState(false);
   const [shapeStart, setShapeStart] = useState({ x: 0, y: 0 });
 
@@ -128,10 +132,6 @@ export default function CollaboratePage() {
   const [history, setHistory] = useState<HistorySnapshot[]>([emptySnapshot]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
-  // OCR state
-  const [isOCRProcessing, setIsOCRProcessing] = useState(false);
-  const [ocrProgress, setOcrProgress] = useState(0);
-  const [ocrLines, setOcrLines] = useState<Map<number, OCRLine[]>>(new Map()); // pageIndex -> lines
 
   // Session management state
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -149,11 +149,13 @@ export default function CollaboratePage() {
   const [showSharedImagesModal, setShowSharedImagesModal] = useState(false);
   const sharedImageInputRef = useRef<HTMLInputElement>(null);
 
-  const { peerId, isConnecting, isConnected, connectedPeers, initPeer, connectToPeer, broadcast, sendTo } = usePeer({
+  const { peerId, isConnecting, isConnected, connectedPeers, initPeer, connectToPeer, broadcast, sendTo } = useSupabaseCollab({
     onMessage: handlePeerMessage,
     onPeerConnect: (id) => { handlePeerConnect(id); notify("Someone joined!"); },
     onPeerDisconnect: () => notify("Someone left"),
   });
+
+  const totalOnline = connectedPeers.length + 1; // +1 for self
 
   const notify = (msg: string) => { setNotification(msg); setTimeout(() => setNotification(null), 3000); };
 
@@ -213,18 +215,37 @@ export default function CollaboratePage() {
     }
   }, [historyIndex, history, restoreSnapshot]);
 
+  const upsertElementById = useCallback((list: PDFElement[], element: PDFElement) => {
+    const existingIndex = list.findIndex((item) => item.id === element.id);
+    if (existingIndex === -1) return [...list, element];
+
+    const next = [...list];
+    next[existingIndex] = { ...next[existingIndex], ...element };
+    return next;
+  }, []);
+
   function handlePeerMessage(message: PeerMessage, fromId: string) {
     switch (message.type) {
       case "pdf-data": setPdfBase64(message.data); break;
-      case "add-element": setElements(p => [...p, message.element]); break;
-      case "update-element": setElements(p => p.map(el => el.id === message.id ? { ...el, ...message.updates } : el)); break;
+      case "add-element":
+        setElements((p) => upsertElementById(p, message.element));
+        break;
+      case "update-element":
+        // Mark this element as remotely updated so onChange won't echo it back
+        remoteUpdatedIdsRef.current.add(message.id);
+        setTimeout(() => remoteUpdatedIdsRef.current.delete(message.id), 500);
+        setElements(p => p.map(el => el.id === message.id ? { ...el, ...message.updates } : el));
+        break;
       case "delete-element": setElements(p => p.filter(el => el.id !== message.id)); break;
       case "sync-request": sendTo(fromId, { type: "sync-response", state: { pdfBase64, elements, pages, sharedImages } }); break;
       case "sync-response":
-        setPdfBase64(message.state.pdfBase64);
-        setElements(message.state.elements);
-        setPages(message.state.pages);
-        if (message.state.sharedImages) setSharedImages(message.state.sharedImages);
+        // Only accept sync-response if it has actual data
+        if (message.state.pdfBase64) {
+          setPdfBase64(message.state.pdfBase64);
+          setElements(message.state.elements);
+          setPages(message.state.pages);
+          if (message.state.sharedImages) setSharedImages(message.state.sharedImages);
+        }
         break;
       case "share-image":
         setSharedImages(p => [...p, message.image]);
@@ -233,9 +254,17 @@ export default function CollaboratePage() {
       case "delete-shared-image":
         setSharedImages(p => p.filter(img => img.id !== message.id));
         break;
+      case "peer-count":
+        // Handled by Supabase Presence — no-op
+        break;
     }
   }
-  function handlePeerConnect(remoteId: string) { sendTo(remoteId, { type: "sync-response", state: { pdfBase64, elements, pages, sharedImages } }); }
+  function handlePeerConnect(remoteId: string) {
+    // Only send sync-response if we actually have data (host has PDF loaded)
+    if (pdfBase64) {
+      sendTo(remoteId, { type: "sync-response", state: { pdfBase64, elements, pages, sharedImages } });
+    }
+  }
 
   const startHosting = useCallback(async (createNew: boolean) => {
     initPeer();
@@ -243,8 +272,19 @@ export default function CollaboratePage() {
     setMode("host");
   }, [initPeer]);
 
-  const joinSession = useCallback(() => { initPeer(); setMode("join"); }, [initPeer]);
-  const connectToHost = useCallback(() => { if (joinCode.trim()) { connectToPeer(joinCode.trim()); setTimeout(() => broadcast({ type: "sync-request" }), 1000); setMode("editor"); } }, [joinCode, connectToPeer, broadcast]);
+  // Whether we are the host (created the room, not joining)
+  const isHost = !joinCode.trim();
+
+  const joinSession = useCallback(() => { setMode("join"); }, []);
+  const connectToHost = useCallback(() => {
+    if (joinCode.trim()) {
+      connectToPeer(joinCode.trim(), () => {
+        // Send sync-request once subscribed to channel
+        broadcast({ type: "sync-request" });
+      });
+      setMode("editor");
+    }
+  }, [joinCode, connectToPeer, broadcast]);
 
   const handlePDFUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
@@ -338,7 +378,7 @@ export default function CollaboratePage() {
       textStyle: { ...textStyle },
       isFlowText: true
     };
-    setElements(p => [...p, el]);
+    setElements((p) => upsertElementById(p, el));
     broadcast({ type: "add-element", element: el });
     return el;
   };
@@ -364,84 +404,29 @@ export default function CollaboratePage() {
   };
 
   const updateElement = (id: string, updates: Partial<PDFElement>, skipHistory = false) => {
+    // If this element was just updated by a remote peer, skip to prevent echo
+    if (remoteUpdatedIdsRef.current.has(id)) return;
+
     const newElements = elements.map(el => el.id === id ? { ...el, ...updates } : el);
     setElements(newElements);
     if (!skipHistory) saveToHistory(buildSnapshot(newElements));
-    broadcast({ type: "update-element", id, updates });
-  };
 
-  // OCR - Extract text from current page
-  const runOCR = async () => {
-    if (!canvasRef.current || isOCRProcessing) return;
-
-    setIsOCRProcessing(true);
-    setOcrProgress(0);
-    notify("Extracting text from page...");
-
-    try {
-      const canvas = canvasRef.current;
-      const pageWidth = pages[currentPage]?.width || 595;
-      const pageHeight = pages[currentPage]?.height || 842;
-
-      // Get scale factors to convert OCR coordinates to PDF coordinates
-      const scaleX = pageWidth / canvas.width;
-      const scaleY = pageHeight / canvas.height;
-
-      const result = await extractTextFromImage(canvas, (progress) => {
-        setOcrProgress(progress);
-      });
-
-      // Scale coordinates to match PDF page
-      const scaledResult = scaleOCRResult(result, scaleX, scaleY);
-
-      // Store OCR lines for this page
-      setOcrLines(prev => {
-        const newMap = new Map(prev);
-        newMap.set(currentPage, scaledResult.lines);
-        return newMap;
-      });
-
-      // Create editable text elements from OCR lines
-      const newElements: PDFElement[] = [];
-      for (const line of scaledResult.lines) {
-        if (line.text.trim()) {
-          const el: PDFElement = {
-            id: generateId(),
-            type: "text",
-            pageIndex: currentPage,
-            x: line.x,
-            y: line.y,
-            width: line.width + 20, // Add padding
-            height: line.height + 10,
-            content: line.text,
-            textStyle: {
-              ...DEFAULT_TEXT_STYLE,
-              fontSize: Math.max(10, Math.round(line.height * 0.8)), // Estimate font size from line height
-            },
-            isOCRText: true, // Mark as OCR-extracted
-          };
-          newElements.push(el);
-        }
-      }
-
-      // Add all OCR elements
-      if (newElements.length > 0) {
-        const allElements = [...elements, ...newElements];
-        setElements(allElements);
-        saveToHistory(buildSnapshot(allElements));
-        newElements.forEach(el => broadcast({ type: "add-element", element: el }));
-        notify(`Extracted ${newElements.length} text blocks!`);
-      } else {
-        notify("No text found on this page");
-      }
-    } catch (error) {
-      console.error("OCR Error:", error);
-      notify("OCR failed. Please try again.");
-    } finally {
-      setIsOCRProcessing(false);
-      setOcrProgress(0);
+    // Debounce content broadcasts (150ms) to avoid rate limiting
+    const isContentUpdate = "content" in updates;
+    if (isContentUpdate) {
+      const existing = broadcastTimersRef.current.get(id);
+      if (existing) clearTimeout(existing);
+      broadcastTimersRef.current.set(id, setTimeout(() => {
+        broadcast({ type: "update-element", id, updates });
+        broadcastTimersRef.current.delete(id);
+      }, 150));
+    } else {
+      // Position/size updates: send immediately (they only fire on dragStop/resizeStop)
+      broadcast({ type: "update-element", id, updates });
     }
   };
+
+
 
   const addPage = async (size: PageSize = PAGE_SIZES.A4) => {
     if (!pdfBase64) return;
@@ -672,7 +657,7 @@ export default function CollaboratePage() {
   }, [elements, pages, pdfBase64, currentSessionId, saveSession]);
 
   const downloadPDF = async () => { if (!pdfBase64) return; const bytes = await addElementsToPDF(base64ToArrayBuffer(pdfBase64), elements); downloadBlob(new Blob([new Uint8Array(bytes)], { type: "application/pdf" }), "document.pdf"); };
-  const copyId = () => { if (peerId) { navigator.clipboard.writeText(peerId); setCopied(true); setTimeout(() => setCopied(false), 2000); } };
+  const copyId = () => { const code = sessionCode; if (code) { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000); } };
 
   const handleCanvasClick = () => {
     // Click on page to start typing - enter document mode
@@ -720,10 +705,22 @@ export default function CollaboratePage() {
 
   useEffect(() => {
     if (!pdfBase64 || !canvasRef.current) return;
+    let isDisposed = false;
+
+    const cancelActiveRender = () => {
+      if (renderTaskRef.current) {
+        renderTaskRef.current.cancel();
+        renderTaskRef.current = null;
+      }
+    };
+
     const render = async () => {
+      cancelActiveRender();
       const pdfjsLib = await import("pdfjs-dist");
+      if (isDisposed || !canvasRef.current) return;
       pdfjsLib.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@5.4.530/build/pdf.worker.min.mjs";
       const pdf = await (await pdfjsLib.getDocument({ data: base64ToArrayBuffer(pdfBase64) })).promise;
+      if (isDisposed || !canvasRef.current) return;
       const page = await pdf.getPage(currentPage + 1);
       const canvas = canvasRef.current!; const ctx = canvas.getContext("2d")!;
       const dpr = window.devicePixelRatio || 1;
@@ -741,10 +738,35 @@ export default function CollaboratePage() {
       canvas.height = pageHeight * dpr;
       canvas.style.width = pageWidth + "px";
       canvas.style.height = pageHeight + "px";
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.scale(dpr, dpr);
-      await page.render({ canvasContext: ctx, viewport: scaledVp } as any).promise;
+
+      const task = page.render({ canvasContext: ctx, viewport: scaledVp, canvas } as any);
+      renderTaskRef.current = task;
+
+      try {
+        await task.promise;
+      } catch (error: unknown) {
+        const isCancelError =
+          error instanceof Error &&
+          (error.name === "RenderingCancelledException" || error.message === "Rendering cancelled");
+        if (!isCancelError) throw error;
+      } finally {
+        if (renderTaskRef.current === task) {
+          renderTaskRef.current = null;
+        }
+      }
     };
-    render(); window.addEventListener("resize", render); return () => window.removeEventListener("resize", render);
+
+    render();
+    window.addEventListener("resize", render);
+
+    return () => {
+      isDisposed = true;
+      window.removeEventListener("resize", render);
+      cancelActiveRender();
+    };
   }, [pdfBase64, currentPage, pages]); // Re-render when page changes, but not on zoom (CSS transform handles zoom)
 
   useEffect(() => {
@@ -755,12 +777,22 @@ export default function CollaboratePage() {
     }
   }, [showSignatureModal]);
 
-  const getSessionUrl = () => typeof window !== "undefined" && peerId ? window.location.origin + "/collaborate?join=" + peerId : "";
+  // Room code is the peerId for everyone (host and joiners share the same room code)
+  const sessionCode = peerId;
+  const getSessionUrl = () => typeof window !== "undefined" && sessionCode ? window.location.origin + "/collaborate?join=" + sessionCode : "";
 
+  // Auto-join from URL parameter
   useEffect(() => {
     if (typeof window !== "undefined") {
       const join = new URLSearchParams(window.location.search).get("join");
-      if (join) { setJoinCode(join); joinSession(); setTimeout(() => { connectToPeer(join); setTimeout(() => broadcast({ type: "sync-request" }), 1000); setMode("editor"); }, 1000); }
+      if (join) {
+        setJoinCode(join);
+        setMode("join");
+        connectToPeer(join, () => {
+          broadcast({ type: "sync-request" });
+        });
+        setMode("editor");
+      }
     }
   }, []);
 
@@ -999,20 +1031,23 @@ export default function CollaboratePage() {
     );
   }
 
-  if (mode === "host" && !pdfBase64) {
-    // ... existing host code ...
+  if (mode === "host") {
+    // Show session code screen before entering editor
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
         <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"><div className="max-w-6xl mx-auto px-4 py-4"><button onClick={() => setMode("select")} className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400"><ArrowLeft className="w-4 h-4" />Back</button></div></header>
         <main className="max-w-xl mx-auto px-4 py-16 text-center">
-          {isConnecting ? (<div className="animate-pulse"><div className="w-16 h-16 bg-zinc-200 dark:bg-zinc-800 rounded-full mx-auto mb-4" /><p className="text-zinc-600">Setting up...</p></div>) : (
+          {sessionCode ? (
             <><div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 mb-6">
               <QRCodeSVG value={getSessionUrl()} size={200} className="mx-auto mb-6" />
               <p className="text-sm text-zinc-600 mb-4">Scan to join</p>
-              <div className="flex items-center justify-center gap-2 p-3 bg-zinc-100 dark:bg-zinc-800 rounded-lg"><code className="text-sm font-mono">{peerId}</code><button onClick={copyId} className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded">{copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}</button></div>
+              <div className="flex items-center justify-center gap-2 p-3 bg-zinc-100 dark:bg-zinc-800 rounded-lg"><code className="text-lg font-mono font-bold tracking-widest">{sessionCode}</code><button onClick={copyId} className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded">{copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}</button></div>
+              {isConnecting && <p className="text-xs text-amber-500 mt-2">Connecting to server...</p>}
             </div>
-              <div className="flex items-center justify-center gap-4 text-sm text-zinc-500"><Users className="w-4 h-4" />{connectedPeers.length} connected</div>
+              <div className="flex items-center justify-center gap-4 text-sm text-zinc-500"><Users className="w-4 h-4" />{totalOnline} online</div>
               <button onClick={() => setMode("editor")} className="mt-8 px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-medium">Continue to Editor</button></>
+          ) : (
+            <div className="animate-pulse"><div className="w-16 h-16 bg-zinc-200 dark:bg-zinc-800 rounded-full mx-auto mb-4" /><p className="text-zinc-600">Setting up...</p></div>
           )}
         </main>
       </div>
@@ -1028,7 +1063,7 @@ export default function CollaboratePage() {
           <div className="text-center mb-8"><div className="w-16 h-16 bg-violet-100 dark:bg-violet-900/50 rounded-full flex items-center justify-center mx-auto mb-4"><QrCode className="w-8 h-8 text-violet-600" /></div><h2 className="text-2xl font-bold mb-2">Join Session</h2><p className="text-zinc-600">Enter session code</p></div>
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800">
             <input type="text" value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="Session code" className="w-full px-4 py-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-center font-mono text-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            <button onClick={connectToHost} disabled={!joinCode.trim() || !isConnected} className="w-full px-6 py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-zinc-300 text-white rounded-xl font-medium">{isConnecting ? "Connecting..." : "Join"}</button>
+            <button onClick={connectToHost} disabled={!joinCode.trim()} className="w-full px-6 py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-zinc-300 text-white rounded-xl font-medium">{isConnecting ? "Connecting..." : "Join"}</button>
           </div>
         </main>
       </div>
@@ -1045,7 +1080,7 @@ export default function CollaboratePage() {
             <button onClick={() => setMode("select")} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg"><ArrowLeft className="w-5 h-5" /></button>
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-zinc-500" />
-              <span className="text-sm text-zinc-600 dark:text-zinc-400">{connectedPeers.length + 1} online</span>
+              <span className="text-sm text-zinc-600 dark:text-zinc-400">{totalOnline} online</span>
             </div>
             <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700 mx-2" />
             <div className="flex items-center gap-2">
@@ -1379,15 +1414,6 @@ export default function CollaboratePage() {
 
         {/* Tools */}
         <div className="flex items-center gap-1 border-l border-zinc-200 dark:border-zinc-600 pl-2 ml-auto">
-          <button
-            onClick={runOCR}
-            disabled={isOCRProcessing}
-            className={`p-2 rounded flex items-center gap-1 ${isOCRProcessing ? "bg-amber-100 dark:bg-amber-900/50 text-amber-600" : "hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-600 dark:text-amber-400"}`}
-            title="Extract Text (OCR)"
-          >
-            {isOCRProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanText className="w-4 h-4" />}
-            {isOCRProcessing && <span className="text-xs">{ocrProgress}%</span>}
-          </button>
           <button onClick={() => imageInputRef.current?.click()} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded" title="Add Image"><ImageIcon className="w-4 h-4" /></button>
           <button
             onClick={() => setShowSharedImagesModal(true)}
@@ -1662,10 +1688,10 @@ export default function CollaboratePage() {
             <h3 className="text-lg font-semibold mb-4">Share Session</h3>
             <div className="flex justify-center mb-4"><QRCodeSVG value={getSessionUrl()} size={150} /></div>
             <div className="flex items-center gap-2 p-3 bg-zinc-100 dark:bg-zinc-800 rounded-lg mb-4">
-              <code className="text-sm font-mono flex-1 truncate">{peerId}</code>
+              <code className="text-sm font-mono flex-1 truncate">{sessionCode}</code>
               <button onClick={copyId} className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded">{copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}</button>
             </div>
-            <p className="text-sm text-zinc-500 text-center mb-4">{connectedPeers.length} collaborator(s) connected</p>
+            <p className="text-sm text-zinc-500 text-center mb-4">{totalOnline} online</p>
             <button onClick={() => setShowShareModal(false)} className="w-full px-4 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-xl font-medium">Close</button>
           </div>
         </div>
