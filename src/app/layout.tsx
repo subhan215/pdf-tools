@@ -13,6 +13,7 @@ export const metadata: Metadata = {
   description: "Free, private PDF tools. Edit, create, merge, split, compress PDFs. Collaborate across devices in real-time. No signup required. 100% browser-based.",
   keywords: ["PDF editor", "PDF tools", "merge PDF", "split PDF", "compress PDF", "collaborate PDF", "free PDF editor", "PeerDoc"],
   authors: [{ name: "PeerDoc" }],
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   openGraph: {
     title: "PeerDoc - Free Online PDF Editor & Collaborator",
     description: "Free, private PDF tools. Collaborate across devices in real-time. No signup required.",

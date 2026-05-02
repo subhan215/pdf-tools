@@ -97,8 +97,8 @@ const trustPoints = [
   },
   {
     icon: Lock,
-    title: "P2P Collaboration",
-    description: "Direct peer-to-peer connection. No middleman. End-to-end encrypted sync across devices.",
+    title: "Realtime Collaboration",
+    description: "Sync edits across devices in real time so shared PDF sessions stay aligned while you work.",
   },
   {
     icon: Zap,
@@ -274,7 +274,7 @@ export default function Home() {
       <section className="max-w-6xl mx-auto px-4 pb-20">
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-orange-300 via-orange-400 to-orange-500 p-10 md:p-14 text-center text-white">
           <div className="relative z-10">
-            <h2 className="text-2xl md:text-3xl font-bold mb-3">Ready to maaryo your PDFs?</h2>
+            <h2 className="text-2xl md:text-3xl font-bold mb-3">Ready to work on your PDFs?</h2>
             <p className="text-white/80 mb-8 max-w-lg mx-auto">
               Jump in and start editing. No signup, no credit card, no nonsense.
             </p>
@@ -306,6 +306,12 @@ export default function Home() {
               <p className="text-sm text-zinc-400 dark:text-zinc-500 text-center">
                 100% free. Your files never leave your browser.
               </p>
+              <Link href="/privacy" className="text-sm text-zinc-500 hover:text-orange-500 transition-colors">
+                Privacy
+              </Link>
+              <Link href="/terms" className="text-sm text-zinc-500 hover:text-orange-500 transition-colors">
+                Terms
+              </Link>
               <Link href="/feedback" className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-zinc-500 hover:text-orange-500 transition-colors">
                 <MessageSquare className="w-3.5 h-3.5" />Feedback
               </Link>
