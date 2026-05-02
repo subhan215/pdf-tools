@@ -19,6 +19,10 @@ export const metadata: Metadata = {
     description: "Free, private PDF tools. Collaborate across devices in real-time. No signup required.",
     type: "website",
   },
+  icons: {
+    icon: "/favicon.png",
+    apple: "/favicon.png",
+  },
 };
 
 const themeScript = `
