@@ -1003,33 +1003,48 @@ export default function EditPage() {
             </Link>
           </div>
         </header>
-        <main className="max-w-xl mx-auto px-4 py-16">
+        <main className="max-w-4xl mx-auto px-4 py-16">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold mb-4">Edit PDF</h1>
             <p className="text-zinc-600 dark:text-zinc-400">Add text, images, shapes, and signatures to your PDF</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-            <label className="block cursor-pointer">
-              <div className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl p-12 text-center hover:border-orange-400 transition-colors h-full flex flex-col items-center justify-center">
-                <Upload className="w-12 h-12 mx-auto mb-4 text-zinc-400" />
-                <p className="font-medium mb-2">Click to upload PDF</p>
-                <p className="text-sm text-zinc-500">or drag and drop</p>
+          <div className="grid md:grid-cols-2 gap-6 mb-8">
+            <label className="cursor-pointer">
+              <div className="p-8 rounded-2xl border-2 border-zinc-200 dark:border-zinc-800 hover:border-orange-500 text-left group h-full transition-all">
+                <div className="w-14 h-14 bg-orange-100 dark:bg-orange-900/50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Upload className="w-7 h-7 text-orange-600 dark:text-orange-400" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Upload PDF</h3>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">Edit an existing document from your device</p>
+                <span className="text-sm font-medium text-orange-600">Choose file</span>
               </div>
               <input type="file" accept=".pdf" className="hidden" onChange={handlePDFUpload} />
             </label>
-            <button onClick={() => createBlank()} className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl p-12 text-center hover:border-orange-400 transition-colors flex flex-col items-center justify-center">
-              <FilePlus className="w-12 h-12 mx-auto mb-4 text-zinc-400" />
-              <p className="font-medium mb-2">Create Blank PDF</p>
-              <p className="text-sm text-zinc-500">Start from scratch (A4)</p>
+
+            <button onClick={() => createBlank()} className="p-8 rounded-2xl border-2 border-zinc-200 dark:border-zinc-800 hover:border-amber-500 text-left group h-full transition-all">
+              <div className="w-14 h-14 bg-amber-100 dark:bg-amber-900/50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <FilePlus className="w-7 h-7 text-amber-600 dark:text-amber-400" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Create Blank</h3>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">Start with a fresh A4 document</p>
+              <span className="text-sm font-medium text-amber-600">Create new</span>
             </button>
           </div>
-          <button
-            onClick={async () => { await loadSessions(); setShowSessionsModal(true); }}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-zinc-200 dark:border-zinc-700 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-          >
-            <FolderOpen className="w-5 h-5 text-zinc-500" />
-            <span className="font-medium">Load Saved Session</span>
-          </button>
+
+          <div className="mb-8">
+            <button
+              onClick={async () => { await loadSessions(); setShowSessionsModal(true); }}
+              className="w-full p-6 rounded-2xl border-2 border-zinc-200 dark:border-zinc-800 hover:border-emerald-500 text-left group flex items-center gap-4 transition-all"
+            >
+              <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-900/50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                <FolderOpen className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold mb-1">My Sessions</h3>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">Continue working on saved sessions</p>
+              </div>
+            </button>
+          </div>
         </main>
 
         {/* Sessions Modal (on upload screen) */}

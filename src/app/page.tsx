@@ -1,21 +1,8 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Users, PenLine, FileImage, Merge, Scissors, FileDown, Stamp, Shield, Lock, Zap, ArrowRight, ServerOff, Sparkles, MessageSquare } from "lucide-react";
 import Link from "next/link";
-import {
-  Users,
-  PenLine,
-  Merge,
-  Scissors,
-  FileDown,
-  Shield,
-  Zap,
-  Lock,
-  Stamp,
-  FileImage,
-  ServerOff,
-  ArrowRight,
-  Sparkles,
-  Globe,
-  MessageSquare,
-} from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const tools = [
@@ -108,6 +95,27 @@ const trustPoints = [
 ];
 
 export default function Home() {
+  const [demoText, setDemoText] = useState("");
+  const [isSelected, setIsSelected] = useState(false);
+  const [isBold, setIsBold] = useState(false);
+
+  useEffect(() => {
+    const text = "Hello World";
+    let index = 0;
+    const typeInterval = setInterval(() => {
+      if (index < text.length) {
+        setDemoText(text.slice(0, index + 1));
+        index++;
+      } else {
+        clearInterval(typeInterval);
+        setTimeout(() => setIsSelected(true), 500);
+        setTimeout(() => setIsBold(true), 1000);
+      }
+    }, 150);
+
+    return () => clearInterval(typeInterval);
+  }, []);
+
   return (
     <div className="min-h-screen bg-orange-50/30 dark:bg-zinc-950">
       {/* Header */}
@@ -133,63 +141,93 @@ export default function Home() {
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-orange-100/60 via-orange-50/30 to-white dark:from-orange-950/30 dark:via-zinc-950 dark:to-zinc-950" />
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-orange-200/30 dark:bg-orange-900/10 rounded-full blur-3xl" />
+      <section className="bg-white dark:bg-zinc-950">
         <div className="relative max-w-6xl mx-auto px-4 pt-20 pb-16 md:pt-28 md:pb-24">
-          <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800/50 rounded-full text-orange-500 dark:text-orange-400 text-sm font-medium mb-8 shadow-sm">
-              <ServerOff className="w-4 h-4" />
-              Your files never leave your browser
+          <div className="grid gap-12 md:grid-cols-[1.2fr_0.8fr] items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-zinc-100 dark:bg-zinc-900 rounded-full text-orange-500 text-sm font-medium mb-8 shadow-sm">
+                <ServerOff className="w-4 h-4" />
+                Your files never leave your browser
+              </div>
+
+              <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight text-zinc-950 dark:text-white mb-6">
+                PDF Tools
+                <br />
+                <span className="text-orange-600 dark:text-orange-400">Made Simple</span>
+              </h1>
+
+              <p className="text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl mb-10 leading-relaxed">
+                Every tool you need to work with PDFs in one place. Secure, intuitive, and fast — no signup required.
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <Link
+                  href="/edit"
+                  className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-orange-500 hover:bg-orange-600 text-white rounded-full font-semibold shadow-lg shadow-orange-300/30 transition-all text-base"
+                >
+                  <PenLine className="w-5 h-5" />
+                  Start Editing
+                </Link>
+                <Link
+                  href="/collaborate"
+                  className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-zinc-950 text-white rounded-full font-semibold hover:bg-zinc-800 transition-colors text-base"
+                >
+                  <Users className="w-5 h-5" />
+                  Collaborate Live
+                </Link>
+              </div>
             </div>
 
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-6">
-              <span className="bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">
-                PDF Tools
-              </span>
-              <br />
-              <span className="text-zinc-800 dark:text-white text-3xl md:text-4xl lg:text-5xl font-bold">
-                That Respect Your Privacy
-              </span>
-            </h1>
-
-            <p className="text-lg md:text-xl text-zinc-500 dark:text-zinc-400 max-w-xl mx-auto mb-10 leading-relaxed">
-              Edit, merge, split, compress &amp; collaborate on PDFs. Everything runs locally in your browser. No signup. No uploads. No limits.
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Link
-                href="/edit"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-orange-400 hover:bg-orange-500 text-white rounded-xl font-semibold shadow-lg shadow-orange-400/30 hover:shadow-orange-500/40 transition-all text-base"
-              >
-                <PenLine className="w-5 h-5" />
-                Start Editing
-              </Link>
-              <Link
-                href="/collaborate"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-white hover:bg-orange-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-orange-200 dark:border-zinc-700 rounded-xl font-semibold transition-colors text-base text-orange-700 dark:text-white"
-              >
-                <Users className="w-5 h-5" />
-                Collaborate Live
-              </Link>
+            <div className="rounded-[32px] border border-orange-100 dark:border-zinc-800 bg-orange-50/80 dark:bg-zinc-900/70 p-8 shadow-xl shadow-orange-200/20">
+              <div className="flex items-center justify-between mb-6">
+                <span className="text-xs uppercase tracking-[0.24em] text-zinc-500">Live PDF editing</span>
+                <span className="text-xs font-semibold text-orange-600">Beta</span>
+              </div>
+              <div className="relative h-[320px] overflow-hidden rounded-[28px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  </div>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">Page 1 of 3</span>
+                </div>
+                <div className="p-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">Edit mode</div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${
+                        isSelected ? "bg-orange-500 text-white" : "bg-orange-100 dark:bg-orange-900 text-orange-600"
+                      }`}>Aa</div>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${
+                        isBold ? "bg-zinc-800 text-white" : "bg-zinc-100 dark:bg-zinc-900 text-zinc-600"
+                      }`}>B</div>
+                    </div>
+                  </div>
+                  <div className="h-[205px] rounded-3xl bg-zinc-100 dark:bg-zinc-950 p-4 shadow-inner shadow-zinc-200/50 dark:shadow-black/20 flex items-center justify-center">
+                    <div
+                      className={`text-2xl transition-all duration-300 ${
+                        isSelected ? "bg-orange-200 dark:bg-orange-900 px-2 py-1 rounded" : ""
+                      } ${isBold ? "font-bold" : "font-normal"}`}
+                    >
+                      {demoText}
+                      <span className="animate-pulse">|</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Trust badges */}
-          <div className="flex flex-wrap items-center justify-center gap-6 mt-14 text-sm text-orange-400/80 dark:text-orange-500/60">
-            <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-6 mt-14 text-sm text-zinc-500 dark:text-zinc-400">
+            <div className="flex items-center gap-2">
               <Shield className="w-4 h-4" />
               <span>100% Private</span>
             </div>
-            <div className="w-1 h-1 rounded-full bg-orange-300 dark:bg-orange-800" />
-            <div className="flex items-center gap-1.5">
+            <div className="h-1 w-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+            <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4" />
               <span>No Signup Needed</span>
-            </div>
-            <div className="w-1 h-1 rounded-full bg-orange-300 dark:bg-orange-800" />
-            <div className="flex items-center gap-1.5">
-              <Globe className="w-4 h-4" />
-              <span>Works Everywhere</span>
             </div>
           </div>
         </div>
@@ -198,29 +236,29 @@ export default function Home() {
       {/* Tools Grid */}
       <section className="max-w-6xl mx-auto px-4 py-20">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold mb-3 text-zinc-800 dark:text-white">Everything You Need</h2>
-          <p className="text-zinc-500 dark:text-zinc-400">Powerful PDF tools, all running locally in your browser.</p>
+          <h2 className="text-3xl font-bold mb-3 text-zinc-800 dark:text-white">Powerful PDF Tools</h2>
+          <p className="text-zinc-500 dark:text-zinc-400 max-w-2xl mx-auto">Merge, split, compress, convert, edit, sign & collaborate on PDFs with just a few clicks.</p>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {tools.map((tool) => (
             <Link
               key={tool.name}
               href={tool.href}
-              className={`group relative p-5 rounded-2xl border transition-all duration-200 hover:shadow-lg hover:shadow-orange-200/40 dark:hover:shadow-orange-900/20 hover:-translate-y-1 ${
+              className={`group relative p-6 rounded-[28px] border transition-all duration-200 hover:shadow-xl hover:shadow-orange-200/30 dark:hover:shadow-orange-900/20 hover:-translate-y-1 ${
                 tool.featured
-                  ? "col-span-2 sm:col-span-1 border-orange-200 dark:border-orange-800/50 bg-gradient-to-br from-orange-50 to-white dark:from-orange-950/30 dark:to-zinc-900"
-                  : "border-orange-100 dark:border-zinc-800 hover:border-orange-300 dark:hover:border-orange-800/50 bg-white dark:bg-zinc-900"
+                  ? "border-orange-200 dark:border-orange-800/50 bg-orange-50/60 dark:bg-orange-900/20"
+                  : "border-orange-100 dark:border-zinc-800 bg-white dark:bg-zinc-900"
               }`}
             >
               {tool.featured && (
-                <span className="absolute top-3 right-3 text-[10px] font-semibold px-2 py-0.5 bg-orange-400 text-white rounded-full">
+                <span className="absolute top-4 right-4 text-xs font-semibold px-3 py-1 bg-orange-400 text-white rounded-full shadow-sm">
                   Popular
                 </span>
               )}
-              <div className={`w-11 h-11 ${tool.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm`}>
-                <tool.icon className="w-5 h-5 text-white" />
+              <div className={`w-12 h-12 ${tool.color} rounded-2xl flex items-center justify-center mb-4 shadow-sm`}>
+                <tool.icon className="w-6 h-6 text-white" />
               </div>
-              <h3 className="font-semibold mb-1 text-zinc-800 dark:text-white">{tool.name}</h3>
+              <h3 className="font-semibold mb-2 text-zinc-800 dark:text-white">{tool.name}</h3>
               <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">{tool.description}</p>
             </Link>
           ))}
@@ -231,8 +269,8 @@ export default function Home() {
       <section className="bg-white dark:bg-zinc-900/50 border-y border-orange-100 dark:border-zinc-800/50">
         <div className="max-w-6xl mx-auto px-4 py-20">
           <div className="text-center mb-14">
-            <h2 className="text-3xl font-bold mb-3 text-zinc-800 dark:text-white">Simple as 1-2-3</h2>
-            <p className="text-zinc-500 dark:text-zinc-400">No learning curve. No account. Just results.</p>
+            <h2 className="text-3xl font-bold mb-3 text-zinc-800 dark:text-white">How It Works</h2>
+            <p className="text-zinc-500 dark:text-zinc-400">Three simple steps to perfect PDFs.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
             {steps.map((item) => (
@@ -251,7 +289,7 @@ export default function Home() {
         <div className="text-center mb-14">
           <h2 className="text-3xl font-bold mb-3 text-zinc-800 dark:text-white">Why PeerDoc?</h2>
           <p className="text-zinc-500 dark:text-zinc-400 max-w-xl mx-auto">
-            We built the PDF tool we wished existed. Private, fast, and truly free.
+            The PDF software trusted by millions. Enjoy all the tools you need while keeping your data safe and secure.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -267,28 +305,6 @@ export default function Home() {
               <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">{item.description}</p>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* CTA Banner */}
-      <section className="max-w-6xl mx-auto px-4 pb-20">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-orange-300 via-orange-400 to-orange-500 p-10 md:p-14 text-center text-white">
-          <div className="relative z-10">
-            <h2 className="text-2xl md:text-3xl font-bold mb-3">Ready to work on your PDFs?</h2>
-            <p className="text-white/80 mb-8 max-w-lg mx-auto">
-              Jump in and start editing. No signup, no credit card, no nonsense.
-            </p>
-            <Link
-              href="/edit"
-              className="inline-flex items-center gap-2 px-7 py-3.5 bg-white text-orange-500 rounded-xl font-semibold hover:bg-orange-50 transition-colors shadow-lg"
-            >
-              Start Free
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-          <div className="absolute top-0 right-0 w-72 h-72 bg-white/10 rounded-full -translate-y-1/3 translate-x-1/3" />
-          <div className="absolute bottom-0 left-0 w-56 h-56 bg-white/10 rounded-full translate-y-1/3 -translate-x-1/3" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-orange-200/10 rounded-full" />
         </div>
       </section>
 
